@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>محلل الصفقات</title>
+<style>
+body{background:#0b0f17;color:#e5e7eb;font-family:Cairo,system-ui,sans-serif;margin:0;padding:16px;max-width:720px;margin:auto}
+h1{font-size:20px}.card{background:#131a27;border:1px solid #243049;border-radius:12px;padding:14px;margin:12px 0}
+label{display:block;font-size:13px;color:#9ca3af;margin-top:8px}
+input{width:100%;box-sizing:border-box;background:#0b0f17;color:#fff;border:1px solid #2d3b57;border-radius:8px;padding:9px;font-size:16px;direction:ltr;text-align:left}
+input.unclear{border-color:#f59e0b;background:#2a2008}
+button:disabled{background:#374151!important;color:#9ca3af!important;cursor:not-allowed;text-decoration:line-through}
+button{background:#0891b2;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:15px;margin-top:10px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.res div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1f2a40}
+.warn{color:#f59e0b;font-size:13px}.err{color:#f87171}img{max-width:100%;border-radius:8px;margin-top:8px}
+</style></head><body>
+<h1>محلل الصفقات</h1>
+<div class="card" id="ai">
+ <b>١) رفع صورة (اختياري)</b>
+ <input type="file" id="file" accept="image/*" style="direction:rtl">
+ <img id="prev" style="display:none">
+ <input id="pass" type="password" placeholder="رمز الدخول للتحليل بالذكاء الاصطناعي" style="display:none;margin-top:8px">
+ <button id="go" disabled>قراءة الصورة بالذكاء الاصطناعي</button>
+ <div id="aimsg" class="warn">⛔ قراءة الصورة بالذكاء الاصطناعي غير مفعّلة حالياً. استخدم الحاسبة اليدوية.</div>
+</div>
+<div class="card">
+ <b>٢) الأرقام (عدّلها بنفسك)</b>
+ <label>الزوج</label><input id="pair" dir="ltr">
+ <div class="row"><div><label>الدخول Entry</label><input id="entry" inputmode="decimal"></div><div><label>وقف الخسارة Stop</label><input id="stop" inputmode="decimal"></div></div>
+ <div class="row"><div><label>الهدف Target</label><input id="target" inputmode="decimal"></div><div><label>الاتجاه (يُحسب)</label><input id="dir" readonly></div></div>
+ <div class="row"><div><label>رصيد الحساب (اختياري)</label><input id="balance" inputmode="decimal"></div><div><label>المخاطرة % من الرصيد</label><input id="riskPct" inputmode="decimal" value="1"></div></div>
+<label style="color:#fbbf24"><input type="checkbox" id="ccy" style="width:auto"> أؤكد أن عملة حسابي = عملة التسعير (الثانية في الزوج، مثل USD في EURUSD، أو الأصل مسعّر بعملة الحساب). بدون التأكيد لا تُعرض مبالغ المخاطرة والحجم.</label>
+<div class="row"><div><label>حجم العقد (اختياري): وحدات في اللوت الواحد</label><input id="contract" inputmode="decimal" placeholder="مثال فوركس 100000، ذهب 100"></div><div><label>حجم البيب/النقطة (اختياري)</label><input id="pip" inputmode="decimal" placeholder="مثال 0.0001"></div></div>
+</div>
+<div class="card res" id="out"></div>
+<p class="warn">الخانات البرتقالية = غير واضحة في الصورة، راجعها. الحسابات لا تحتاج AI وتعمل بدونه. مبالغ المخاطرة والحجم صحيحة فقط عندما تكون عملة الحساب هي عملة التسعير (الثانية في الزوج، مثل USD في EURUSD). غير ذلك يلزم تحويل. هذه أداة حساب وليست نصيحة تداول.</p>
+<script>// Pure trade math. Returns nulls when inputs are missing so nothing is guessed.
+function num(v){const n=parseFloat(v);return Number.isFinite(n)?n:null}
+function calc({entry,stop,target,balance,riskPct,contract,pip}){
+  entry=num(entry);stop=num(stop);target=num(target);balance=num(balance);riskPct=num(riskPct);contract=num(contract);pip=num(pip);
+  const r={direction:null,riskPts:null,rewardPts:null,rr:null,riskPctMove:null,rewardPctMove:null,riskAmt:null,rewardAmt:null,sizeUnits:null,lots:null,riskPips:null,rewardPips:null,errors:[]};
+  if(entry==null||stop==null)return r;
+  if(entry===stop){r.errors.push('stop=entry');return r}
+  r.direction=stop<entry?'LONG':'SHORT';
+  r.riskPts=Math.abs(entry-stop);
+  r.riskPctMove=r.riskPts/entry*100;
+  if(target!=null){
+    const okSide=r.direction==='LONG'?target>entry:target<entry;
+    if(!okSide)r.errors.push('target on wrong side');
+    else{r.rewardPts=Math.abs(target-entry);r.rewardPctMove=r.rewardPts/entry*100;r.rr=r.rewardPts/r.riskPts}
+  }
+  if(pip!=null&&pip>0){r.riskPips=r.riskPts/pip;if(r.rewardPts!=null)r.rewardPips=r.rewardPts/pip}
+  if(balance!=null&&riskPct!=null&&balance>0&&riskPct>0){
+    r.riskAmt=balance*riskPct/100;
+    r.sizeUnits=r.riskAmt/r.riskPts;
+    if(contract!=null&&contract>0)r.lots=r.sizeUnits/contract;
+    if(r.rr!=null)r.rewardAmt=r.riskAmt*r.rr;
+  }
+  return r;
+}
+if(typeof module!=='undefined')module.exports={calc};
+</script>
+<script>
+// Set after deploying the Edge Function. Empty = manual calculator only.
+const FUNCTION_URL = "https://twwpuvtlsxqypyyvpckn.supabase.co/functions/v1/analyze-chart";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3d3B1dnRsc3hxeXB5eXZwY2tuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1MzU0MjAsImV4cCI6MjExMTExMTQyMH0.6u-BO9usoO2vxkCuZr4sUlYZWpkMA-al0Pzn8MIB80U"; // public anon key only, never the Gemini key
+const $=id=>document.getElementById(id);
+const fmt=(n,d=4)=>n==null?'-':(+n.toFixed(d)).toString();
+function render(){
+  const r=calc({entry:$('entry').value,stop:$('stop').value,target:$('target').value,balance:$('balance').value,riskPct:$('riskPct').value,contract:$('contract').value,pip:$('pip').value});
+  const ok=$('ccy').checked;const NA='غير معروض: أكّد عملة الحساب';
+  $('dir').value=r.direction||'';
+  const rows=[['R:R',r.rr==null?'-':'1 : '+fmt(r.rr,2)],['المخاطرة (نقاط السعر)',fmt(r.riskPts)],['العائد (نقاط السعر)',fmt(r.rewardPts)],
+   ['المخاطرة % من الدخول',r.riskPctMove==null?'-':fmt(r.riskPctMove,2)+'%'],['العائد % من الدخول',r.rewardPctMove==null?'-':fmt(r.rewardPctMove,2)+'%'],
+   ['مبلغ المخاطرة',ok?fmt(r.riskAmt,2):NA],['مبلغ العائد المتوقع',ok?fmt(r.rewardAmt,2):NA],['حجم المركز (وحدات من الأصل)',ok?fmt(r.sizeUnits,4):NA],['حجم المركز (لوت)',ok?(r.lots==null&&r.sizeUnits!=null?'أدخل حجم العقد':fmt(r.lots,4)):NA],['المخاطرة (بيبس/نقاط)',fmt(r.riskPips,1)],['العائد (بيبس/نقاط)',fmt(r.rewardPips,1)]];
+  $('out').innerHTML=rows.map(x=>`<div><span>${x[0]}</span><b dir="ltr">${x[1]}</b></div>`).join('')+r.errors.map(e=>'<div class="err">'+(e==='stop=entry'?'الستوب يساوي الدخول':'الهدف في الجهة الخطأ بالنسبة للاتجاه')+'</div>').join('');
+}
+$('ccy').addEventListener('change',render);
+['entry','stop','target','balance','riskPct','contract','pip'].forEach(i=>$(i).addEventListener('input',e=>{e.target.classList.remove('unclear');render()}));
+let b64=null,mime=null;
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;mime=f.type;const rd=new FileReader();
+ rd.onload=()=>{b64=rd.result;$('prev').src=b64;$('prev').style.display='block';$('go').disabled=!FUNCTION_URL;if(FUNCTION_URL)$('pass').style.display='block';
+  $('aimsg').textContent=FUNCTION_URL?'':'⛔ قراءة الصورة غير مفعّلة. أدخل الأرقام يدوياً من الصورة.'};rd.readAsDataURL(f)});
+$('go').addEventListener('click',async()=>{
+  $('go').disabled=true;$('aimsg').textContent='جاري القراءة... قد تستغرق حتى دقيقة.';
+  try{
+    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),70000);const r=await fetch(FUNCTION_URL,{signal:ac.signal,method:'POST',headers:{'Content-Type':'application/json','x-passcode':$('pass').value,apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({image:b64,mimeType:mime})});
+    clearTimeout(to);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||r.status);
+    if(d.pair){$('pair').value=d.pair}
+    for(const k of ['entry','stop','target']){const el=$(k);el.value=d[k]==null?'':d[k];
+      if(d[k]==null||(d.confidence&&d.confidence[k]!=='clear'))el.classList.add('unclear')}
+    $('aimsg').textContent=(d.notes||'')+' راجع الأرقام قبل الاعتماد عليها.';render();
+  }catch(e){const M={provider_busy:'خدمة قراءة الصور مشغولة مؤقتاً عند Google. جرّب بعد دقائق.',rate_limited:'تم تجاوز حد الاستخدام المؤقت. انتظر قليلاً قبل المحاولة.',unauthorized:'رمز الدخول غير صحيح.',locked:'تم قفل المحاولات اليوم بسبب رمز خاطئ متكرر.','daily cap reached':'وصلت للحد اليومي للقراءة. جرّب غداً.','image too large':'الصورة كبيرة. صغّرها وحاول.',model_error:'تعذر قراءة الصورة الآن.','not configured':'الخدمة غير مهيأة.',provider_timeout:'انتهت مهلة خدمة قراءة الصور. جرّب مرة ثانية.','server error':'خطأ في الخدمة. جرّب لاحقاً.'};
+    $('aimsg').innerHTML='<span class="err">'+(M[e.message]||(e.name==='AbortError'?'انتهت مهلة الانتظار. جرّب مرة ثانية.':e.name==='TypeError'?'تعذر الاتصال بالخدمة. تحقق من الإنترنت.':'فشلت القراءة.'))+' أدخل الأرقام يدوياً.</span>'}
+  $('go').disabled=false;
+});
+render();
+</script></body></html>
