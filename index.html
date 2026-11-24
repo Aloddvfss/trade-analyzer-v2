@@ -14,24 +14,29 @@ button{background:#0891b2;color:#fff;border:0;border-radius:8px;padding:10px 16p
 </style></head><body>
 <h1>محلل الصفقات</h1>
 <div class="card" id="ai">
- <b>١) رفع صورة (اختياري)</b>
+ <b>١) ارفع صورة الصفقة أو الشارت</b>
  <input type="file" id="file" accept="image/*" style="direction:rtl">
  <img id="prev" style="display:none">
  <input id="pass" type="password" placeholder="رمز الدخول للتحليل بالذكاء الاصطناعي" style="display:none;margin-top:8px">
- <button id="go" disabled>قراءة الصورة بالذكاء الاصطناعي</button>
+ <button id="go" disabled style="font-size:17px;padding:12px 20px">اقرأ الصورة واحسب</button>
  <div id="aimsg" class="warn">⛔ قراءة الصورة بالذكاء الاصطناعي غير مفعّلة حالياً. استخدم الحاسبة اليدوية.</div>
 </div>
+<div class="card" id="outcard"><b>٢) النتيجة (تُحسب تلقائياً من الأرقام المقروءة)</b><div id="out" class="res"></div></div>
 <div class="card">
- <b>٢) الأرقام (عدّلها بنفسك)</b>
+ <b>٣) الأرقام التي قرأها الذكاء الاصطناعي</b>
+ <div class="warn">تُملأ تلقائياً من الصورة. صحّحها فقط إذا القراءة خاطئة، والحقل البرتقالي أو الفارغ يعني أنه غير واضح في الصورة ولم يُخمَّن.</div>
  <label>الزوج</label><input id="pair" dir="ltr">
  <div class="row"><div><label>الدخول Entry</label><input id="entry" inputmode="decimal"></div><div><label>وقف الخسارة Stop</label><input id="stop" inputmode="decimal"></div></div>
- <div class="row"><div><label>الهدف Target</label><input id="target" inputmode="decimal"></div><div><label>الاتجاه (يُحسب)</label><input id="dir" readonly></div></div>
- <div class="row"><div><label>رصيد الحساب (اختياري)</label><input id="balance" inputmode="decimal"></div><div><label>المخاطرة % من الرصيد</label><input id="riskPct" inputmode="decimal" value="1"></div></div>
-<label style="color:#fbbf24"><input type="checkbox" id="ccy" style="width:auto"> أؤكد أن عملة حسابي = عملة التسعير (الثانية في الزوج، مثل USD في EURUSD، أو الأصل مسعّر بعملة الحساب). بدون التأكيد لا تُعرض مبالغ المخاطرة والحجم.</label>
-<div class="row"><div><label>حجم العقد (اختياري): وحدات في اللوت الواحد</label><input id="contract" inputmode="decimal" placeholder="مثال فوركس 100000، ذهب 100"></div><div><label>حجم البيب/النقطة (اختياري)</label><input id="pip" inputmode="decimal" placeholder="مثال 0.0001"></div></div>
+ <div class="row"><div><label>الهدف Target</label><input id="target" inputmode="decimal"></div><div><label>الاتجاه (يُحسب من الدخول والوقف)</label><input id="dir" readonly></div></div>
 </div>
-<div class="card res" id="out"></div>
-<p class="warn">الخانات البرتقالية = غير واضحة في الصورة، راجعها. الحسابات لا تحتاج AI وتعمل بدونه. مبالغ المخاطرة والحجم صحيحة فقط عندما تكون عملة الحساب هي عملة التسعير (الثانية في الزوج، مثل USD في EURUSD). غير ذلك يلزم تحويل. هذه أداة حساب وليست نصيحة تداول.</p>
+<div class="card">
+ <b>٤) إعدادات حسابك (ليست في الصورة، تُدخلها أنت)</b>
+ <div class="warn">مطلوبة فقط لمبلغ المخاطرة وحجم المركز. لا يوجد افتراض لأي قيمة منها، وبدونها تظهر النتائج بالنقاط والنسب فقط.</div>
+ <div class="row"><div><label>رصيد الحساب</label><input id="balance" inputmode="decimal"></div><div><label>المخاطرة % من الرصيد</label><input id="riskPct" inputmode="decimal" placeholder="مثال 1"></div></div>
+<label style="color:#fbbf24"><input type="checkbox" id="ccy" style="width:auto"> أؤكد أن عملة حسابي = عملة التسعير (الثانية في الزوج، مثل USD في EURUSD، أو الأصل مسعّر بعملة الحساب). بدون التأكيد لا تُعرض مبالغ المخاطرة والحجم.</label>
+<div class="row"><div><label>حجم العقد: وحدات في اللوت الواحد</label><input id="contract" inputmode="decimal" placeholder="مثال فوركس 100000، ذهب 100"></div><div><label>حجم البيب/النقطة</label><input id="pip" inputmode="decimal" placeholder="مثال 0.0001"></div></div>
+</div>
+<p class="warn">الخانات البرتقالية = غير واضحة في الصورة، راجعها. الأرقام تُقرأ من الصورة بالذكاء الاصطناعي، والحسابات تعمل أيضاً بالإدخال اليدوي إذا فشلت القراءة. مبالغ المخاطرة والحجم صحيحة فقط عندما تكون عملة الحساب هي عملة التسعير (الثانية في الزوج، مثل USD في EURUSD). غير ذلك يلزم تحويل. هذه أداة حساب وليست نصيحة تداول.</p>
 <script>// Pure trade math. Returns nulls when inputs are missing so nothing is guessed.
 function num(v){const n=parseFloat(v);return Number.isFinite(n)?n:null}
 function calc({entry,stop,target,balance,riskPct,contract,pip}){
