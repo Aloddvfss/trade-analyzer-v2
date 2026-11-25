@@ -18,9 +18,15 @@ button{background:#0891b2;color:#fff;border:0;border-radius:8px;padding:10px 16p
  <input type="file" id="file" accept="image/*" style="direction:rtl">
  <img id="prev" style="display:none">
  <input id="pass" type="password" placeholder="رمز الدخول للتحليل بالذكاء الاصطناعي" style="display:none;margin-top:8px">
+ <label style="margin-top:10px">صورة ثانية اختيارية: فريم أكبر (مثل H1) لتحليل الهيكلية</label>
+ <input type="file" id="file2" accept="image/*" style="direction:rtl">
  <button id="go" disabled style="font-size:17px;padding:12px 20px">اقرأ الصورة واحسب</button>
+ <button id="an" disabled style="font-size:17px;padding:12px 20px;margin-inline-start:8px;background:#7c3aed">حلّل الشارت SMC + SNR</button>
  <div id="aimsg" class="warn">⛔ قراءة الصورة بالذكاء الاصطناعي غير مفعّلة حالياً. استخدم الحاسبة اليدوية.</div>
 </div>
+<div class="card" id="ancard" style="display:none"><b>تحليل الشارت (سيناريوهات مشروطة، ليست إشارات مضمونة)</b>
+ <div class="warn">الصورة ليست سعراً مباشراً. الهيكلية (SMC) تُذكر فقط للفريم الظاهر في كل صورة. تعريف OCL هنا مؤقت: مستوى الفتح أو الإغلاق لشمعة بارزة. قد يخطئ الذكاء الاصطناعي في الرسم، راجع كل رقم.</div>
+ <div id="anout"></div></div>
 <div class="card" id="outcard"><b>٢) النتيجة (تُحسب تلقائياً من الأرقام المقروءة)</b><div id="out" class="res"></div></div>
 <div class="card">
  <b>٣) الأرقام التي قرأها الذكاء الاصطناعي</b>
@@ -96,6 +102,53 @@ $('go').addEventListener('click',async()=>{
   }catch(e){const M={provider_busy:'خدمة قراءة الصور مشغولة مؤقتاً عند Google. جرّب بعد دقائق.',rate_limited:'تم تجاوز حد الاستخدام المؤقت. انتظر قليلاً قبل المحاولة.',unauthorized:'رمز الدخول غير صحيح.',locked:'تم قفل المحاولات اليوم بسبب رمز خاطئ متكرر.','daily cap reached':'وصلت للحد اليومي للقراءة. جرّب غداً.','image too large':'الصورة كبيرة. صغّرها وحاول.',model_error:'تعذر قراءة الصورة الآن.','not configured':'الخدمة غير مهيأة.',provider_timeout:'انتهت مهلة خدمة قراءة الصور. جرّب مرة ثانية.','server error':'خطأ في الخدمة. جرّب لاحقاً.'};
     $('aimsg').innerHTML='<span class="err">'+(M[e.message]||(e.name==='AbortError'?'انتهت مهلة الانتظار. جرّب مرة ثانية.':e.name==='TypeError'?'تعذر الاتصال بالخدمة. تحقق من الإنترنت.':'فشلت القراءة.'))+' أدخل الأرقام يدوياً.</span>'}
   $('go').disabled=false;
+});
+let b64b=null,mimeb=null;
+$('file2').addEventListener('change',e=>{const f=e.target.files[0];if(!f){b64b=null;return}mimeb=f.type;const rd=new FileReader();rd.onload=()=>{b64b=rd.result};rd.readAsDataURL(f)});
+$('file').addEventListener('change',()=>{if(FUNCTION_URL)$('an').disabled=false});
+function el(t,txt,cls){const e=document.createElement(t);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e}
+function nv(v){return v==null?'غير واضح':String(v)}
+function renderAn(d){
+  const o=$('anout');o.innerHTML='';$('ancard').style.display='block';
+  o.appendChild(el('div',(d.pair||'الزوج غير واضح')+' | '+(d.timeframe||'الفريم غير واضح')+' | جودة الصورة: '+nv(d.image_quality)));
+  if(d.sufficient===false){const m=el('div','الصورة لا تكفي لتحليل كامل. الناقص: '+((d.missing||[]).join('، ')||'غير محدد'),'warn');o.appendChild(m)}
+  const smc=d.smc||{};
+  o.appendChild(el('h3','SMC: الهيكلية والسيولة'));
+  o.appendChild(el('div','الفريم المعتمد: '+nv(smc.timeframe_basis)+' | الهيكلية: '+nv(smc.structure)));
+  if(smc.summary)o.appendChild(el('div',smc.summary));
+  (smc.events||[]).forEach(x=>o.appendChild(el('div','• '+x.type+': '+x.note)));
+  (smc.liquidity||[]).forEach(x=>o.appendChild(el('div','• سيولة '+x.type+(x.price!=null?' عند '+x.price:'')+': '+x.note)));
+  o.appendChild(el('h3','SNR: المناطق'));
+  (d.snr||[]).forEach(x=>o.appendChild(el('div','• '+x.type+' ('+x.side+') '+nv(x.low)+' - '+nv(x.high)+': '+x.note)));
+  o.appendChild(el('h3','السيناريوهات'));
+  (d.scenarios||[]).forEach((sc,i)=>{
+    const box=el('div',null,'card');
+    const t=sc.targets||[];
+    box.appendChild(el('b',(i+1)+') '+sc.bias+' من منطقة '+sc.zone_type));
+    box.appendChild(el('div','منطقة الدخول: '+nv(sc.entry_low)+' - '+nv(sc.entry_high)));
+    box.appendChild(el('div','الوقف: '+nv(sc.stop)+' | T1: '+nv(t[0])+' | T2: '+nv(t[1])+' | T3: '+nv(t[2])));
+    box.appendChild(el('div','الشرط: '+sc.condition));
+    (sc.reasons||[]).forEach(r=>box.appendChild(el('div','- '+r)));
+    box.appendChild(el('div','يبطل السيناريو إذا: '+sc.invalidation,'warn'));
+    if(sc.entry_low!=null&&sc.entry_high!=null&&sc.stop!=null&&t[0]!=null){
+      const b=el('button','ضع في الحاسبة (دخول = منتصف المنطقة، هدف = T1)');
+      b.onclick=()=>{$('entry').value=+(((+sc.entry_low)+(+sc.entry_high))/2).toFixed(6);$('stop').value=sc.stop;$('target').value=t[0];if(d.pair)$('pair').value=d.pair;render();$('outcard').scrollIntoView()};
+      box.appendChild(b)}
+    o.appendChild(box)});
+  if(!(d.scenarios||[]).length)o.appendChild(el('div','لا توجد سيناريوهات واضحة من هذه الصورة.','warn'));
+  (d.caveats||[]).forEach(c=>o.appendChild(el('div','تنبيه: '+c,'warn')));
+}
+$('an').addEventListener('click',async()=>{
+  $('an').disabled=true;$('go').disabled=true;$('aimsg').textContent='جاري التحليل... قد يستغرق حتى دقيقة.';
+  try{
+    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),70000);
+    const body={mode:'analyze',image:b64,mimeType:mime};if(b64b){body.image2=b64b;body.mimeType2=mimeb}
+    const r=await fetch(FUNCTION_URL,{signal:ac.signal,method:'POST',headers:{'Content-Type':'application/json','x-passcode':$('pass').value,apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify(body)});
+    clearTimeout(to);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||r.status);
+    renderAn(d);$('aimsg').textContent='تم التحليل. هذه سيناريوهات مشروطة وليست إشارات مضمونة.';
+  }catch(e){const M={provider_busy:'خدمة Google مشغولة مؤقتاً. جرّب بعد دقائق.',rate_limited:'تم تجاوز حد الاستخدام المؤقت. انتظر قليلاً.',unauthorized:'رمز الدخول غير صحيح.',locked:'تم قفل المحاولات اليوم بسبب رمز خاطئ متكرر.','daily cap reached':'وصلت للحد اليومي. جرّب غداً.','image too large':'الصورة كبيرة. صغّرها وحاول.',model_error:'تعذر التحليل الآن.',provider_timeout:'انتهت مهلة خدمة Google. جرّب مرة ثانية.','server error':'خطأ في الخدمة. جرّب لاحقاً.'};
+    $('aimsg').innerHTML='';const sp=el('span',(M[e.message]||(e.name==='AbortError'?'انتهت مهلة الانتظار.':e.name==='SyntaxError'?'جاء رد غير مفهوم من الخدمة.':'فشل التحليل.')),'err');$('aimsg').appendChild(sp)}
+  $('an').disabled=false;$('go').disabled=false;
 });
 render();
 </script></body></html>
