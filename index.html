@@ -14,6 +14,7 @@ button{background:#0891b2;color:#fff;border:0;border-radius:8px;padding:10px 16p
 </style></head><body>
 <h1>محلل الصفقات</h1>
 <div class="card" id="ai">
+ <div id="trialwarn" style="background:#3b2a05;border:1px solid #f59e0b;color:#fde68a;border-radius:8px;padding:10px;margin-bottom:10px;font-size:14px;line-height:1.6">⚠️ <b>نسخة تجريبية غير مُتحقَّق منها.</b> قراءة الشارت بالذكاء الاصطناعي لم تثبت دقتها بعد، وقد تخطئ أو تخترع أسعاراً وتسمّي المستويات والهيكلية خطأً. الدخول والوقف والأهداف تقديرات غير موثّقة، وليست إشارات ولا نصيحة تداول. راجع كل رقم على الشارت نفسه قبل أي استخدام.</div>
  <b>١) ارفع صورة الصفقة أو الشارت</b>
  <input type="file" id="file" accept="image/*" style="direction:rtl">
  <img id="prev" style="display:none">
@@ -156,7 +157,7 @@ function renderAn(d){
     box.appendChild(line('الشرط: '+sc.condition));
     (sc.reasons||[]).forEach(r=>box.appendChild(line('- '+r)));
     box.appendChild(el('div','يبطل السيناريو إذا: '+sc.invalidation,'warn'));
-    if(!bad){const b=el('button','ضع في الحاسبة (دخول = منتصف المنطقة، هدف = T1)');
+    if(!bad){box.appendChild(el('div','⚠️ هذه أرقام من تحليل غير مُتحقَّق منه. راجعها على الشارت قبل نقلها للحاسبة.','warn'));const b=el('button','ضع في الحاسبة (دخول = منتصف المنطقة، هدف = T1)');
       b.onclick=()=>{$('entry').value=+(((+sc.entry_low)+(+sc.entry_high))/2).toFixed(6);$('stop').value=sc.stop;$('target').value=t[0];if(d.pair)$('pair').value=d.pair;['entry','stop','target','pair'].forEach(k=>derived.add(k));render();$('outcard').scrollIntoView()};
       box.appendChild(b)}
     o.appendChild(box)});
