@@ -22,10 +22,10 @@ button{background:#0891b2;color:#fff;border:0;border-radius:8px;padding:10px 16p
  <input type="file" id="file2" accept="image/*" style="direction:rtl">
  <button id="go" disabled style="font-size:17px;padding:12px 20px">اقرأ الصورة واحسب</button>
  <button id="an" disabled style="font-size:17px;padding:12px 20px;margin-inline-start:8px;background:#7c3aed">حلّل الشارت SMC + SNR</button>
- <div id="aimsg" class="warn">⛔ قراءة الصورة بالذكاء الاصطناعي غير مفعّلة حالياً. استخدم الحاسبة اليدوية.</div>
+ <div id="aimsg" class="warn">ارفع صورة الشارت لتفعيل الأزرار. التحليل بالذكاء الاصطناعي تجريبي وتعليمي فقط وليس نصيحة تداول.</div>
 </div>
 <div class="card" id="ancard" style="display:none"><b>تحليل الشارت (سيناريوهات مشروطة، ليست إشارات مضمونة)</b>
- <div class="warn">الصورة ليست سعراً مباشراً. الهيكلية (SMC) تُذكر فقط للفريم الظاهر في كل صورة. طريقتا OCL وclassic غير مفعّلتين حتى تحدد تعريفك. قد يخطئ الذكاء الاصطناعي في الرسم، راجع كل رقم.</div>
+ <div class="warn">الصورة ليست سعراً مباشراً. الهيكلية (SMC) تُذكر فقط للفريم الظاهر في كل صورة. التحليل يطبّق تعريفاتك المثبتة فقط (BOS وMSS وCHoCH وCISD وOB وFVG وClassic وGap وRBS وQM). CE = منتصف ذيل شمعة الرفض. OCL وفيبوناتشي وIDM وSMT غير مفعّلة. قد يخطئ الذكاء الاصطناعي في الرسم، راجع كل رقم.</div>
  <div id="anout"></div></div>
 <div class="card" id="outcard"><b>٢) النتيجة (تُحسب تلقائياً من الأرقام المقروءة)</b><div id="out" class="res"></div></div>
 <div class="card">
@@ -114,6 +114,7 @@ $('file').addEventListener('change',()=>{if(FUNCTION_URL)$('an').disabled=false}
 function el(t,txt,cls){const e=document.createElement(t);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e}
 function nb(v){const b=document.createElement('bdi');b.dir='ltr';b.textContent=(v==null||v==='')?'غير واضح':String(v);return b}
 function line(){const d=el('div',null);d.dir='auto';for(const p of arguments){d.appendChild(typeof p==='string'?document.createTextNode(p):p)}return d}
+const ZT=['Classic','Gap','RBS','QM','other'];
 function isn(v){return typeof v==='number'&&isFinite(v)}
 function checkSc(sc){
   const t=sc.targets||[];const lo=sc.entry_low,hi=sc.entry_high,st=sc.stop;
@@ -136,12 +137,12 @@ function renderAn(d){
   (smc.events||[]).forEach(x=>o.appendChild(line('• ',nb(x.type),': '+T(x.note))));
   (smc.liquidity||[]).forEach(x=>o.appendChild(line('• سيولة ',nb(x.type),ok&&x.price!=null?' عند ':'',ok&&x.price!=null?nb(x.price):'',': '+T(x.note))));
   o.appendChild(el('h3','SNR: المناطق'));
-  o.appendChild(el('div','طريقتا OCL وclassic غير مفعّلتين حتى تحدد تعريفك لهما. المعروض هنا RBS وQM فقط عندما تكون واضحة.','warn'));
-  (d.snr||[]).filter(x=>x.type==='RBS'||x.type==='QM'||x.type==='other').forEach(x=>{
+  o.appendChild(el('div','المعروض: Classic وGap وRBS وQM فقط عندما تكون واضحة. OCL غير مفعّل. لا يُخترع سعر لـ QM/QML؛ تُعرض فقط الأسعار المقروءة بوضوح على الشارت.','warn'));
+  (d.snr||[]).filter(x=>ZT.includes(x.type)).forEach(x=>{
     const z=ok?[nb(x.low),' - ',nb(x.high)]:[];
     o.appendChild(line('• ',nb(x.type),' ('+x.side+') ',...z,': '+T(x.note)))});
   o.appendChild(el('h3','السيناريوهات'));
-  const scs=(d.scenarios||[]).filter(sc=>sc.zone_type==='RBS'||sc.zone_type==='QM'||sc.zone_type==='other');
+  const scs=(d.scenarios||[]).filter(sc=>ZT.concat(['OB','CISD']).includes(sc.zone_type));
   if(ok){
   scs.forEach((sc,i)=>{
     const box=el('div',null,'card');box.dir='auto';
@@ -150,7 +151,7 @@ function renderAn(d){
     if(bad){box.appendChild(el('div','سيناريو مرفوض: '+bad+'. الأرقام غير معروضة ولا يمكن نقلها للحاسبة.','warn'))}
     else{
       box.appendChild(line('منطقة الدخول: ',nb(sc.entry_low),' - ',nb(sc.entry_high)));
-      box.appendChild(line('الوقف: ',nb(sc.stop),' | T1: ',nb(t[0]),' | T2: ',nb(t[1]),' | T3: ',nb(t[2])));
+      box.appendChild(line('الوقف: ',nb(sc.stop)));box.appendChild(line('T1: ',nb(t[0])));box.appendChild(line('T2: ',nb(t[1])));box.appendChild(line('T3: ',nb(t[2])));
     }
     box.appendChild(line('الشرط: '+sc.condition));
     (sc.reasons||[]).forEach(r=>box.appendChild(line('- '+r)));
