@@ -87,16 +87,16 @@ function render(){
 $('ccy').addEventListener('change',render);
 ['entry','stop','target','balance','riskPct','contract','pip'].forEach(i=>$(i).addEventListener('input',e=>{e.target.classList.remove('unclear');render()}));
 let b64=null,mime=null;
-$('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;mime=f.type;const rd=new FileReader();
+$('file').addEventListener('change',e=>{clearAn();const f=e.target.files[0];if(!f)return;mime=f.type;const rd=new FileReader();
  rd.onload=()=>{b64=rd.result;$('prev').src=b64;$('prev').style.display='block';$('go').disabled=!FUNCTION_URL;if(FUNCTION_URL)$('pass').style.display='block';
   $('aimsg').textContent=FUNCTION_URL?'':'⛔ قراءة الصورة غير مفعّلة. أدخل الأرقام يدوياً من الصورة.'};rd.readAsDataURL(f)});
 $('go').addEventListener('click',async()=>{
-  $('go').disabled=true;$('aimsg').textContent='جاري القراءة... قد تستغرق حتى دقيقة.';
+  clearAn();$('go').disabled=true;$('aimsg').textContent='جاري القراءة... قد تستغرق حتى دقيقة.';
   try{
     const ac=new AbortController();const to=setTimeout(()=>ac.abort(),70000);const r=await fetch(FUNCTION_URL,{signal:ac.signal,method:'POST',headers:{'Content-Type':'application/json','x-passcode':$('pass').value,apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({image:b64,mimeType:mime})});
     clearTimeout(to);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||r.status);
-    if(d.pair){$('pair').value=d.pair}
-    for(const k of ['entry','stop','target']){const el=$(k);el.value=d[k]==null?'':d[k];
+    if(d.pair){$('pair').value=d.pair;derived.add('pair')}
+    for(const k of ['entry','stop','target']){const el=$(k);el.value=d[k]==null?'':d[k];if(d[k]!=null)derived.add(k);
       if(d[k]==null||(d.confidence&&d.confidence[k]!=='clear'))el.classList.add('unclear')}
     $('aimsg').textContent=(d.notes||'')+' راجع الأرقام قبل الاعتماد عليها.';render();
   }catch(e){const M={provider_busy:'خدمة قراءة الصور مشغولة مؤقتاً عند Google. جرّب بعد دقائق.',rate_limited:'تم تجاوز حد الاستخدام المؤقت. انتظر قليلاً قبل المحاولة.',unauthorized:'رمز الدخول غير صحيح.',locked:'تم قفل المحاولات اليوم بسبب رمز خاطئ متكرر.','daily cap reached':'وصلت للحد اليومي للقراءة. جرّب غداً.','image too large':'الصورة كبيرة. صغّرها وحاول.',model_error:'تعذر قراءة الصورة الآن.','not configured':'الخدمة غير مهيأة.',provider_timeout:'انتهت مهلة خدمة قراءة الصور. جرّب مرة ثانية.','server error':'خطأ في الخدمة. جرّب لاحقاً.'};
@@ -104,7 +104,12 @@ $('go').addEventListener('click',async()=>{
   $('go').disabled=false;
 });
 let b64b=null,mimeb=null;
-$('file2').addEventListener('change',e=>{const f=e.target.files[0];if(!f){b64b=null;return}mimeb=f.type;const rd=new FileReader();rd.onload=()=>{b64b=rd.result};rd.readAsDataURL(f)});
+const derived=new Set();
+function clearAn(){$('anout').innerHTML='';$('ancard').style.display='none';
+ for(const k of ['entry','stop','target','pair']){if(derived.has(k)){$(k).value='';$(k).classList.remove('unclear')}}
+ derived.clear();render()}
+['entry','stop','target','pair'].forEach(k=>$(k).addEventListener('input',()=>derived.delete(k)));
+$('file2').addEventListener('change',e=>{clearAn();const f=e.target.files[0];if(!f){b64b=null;return}mimeb=f.type;const rd=new FileReader();rd.onload=()=>{b64b=rd.result};rd.readAsDataURL(f)});
 $('file').addEventListener('change',()=>{if(FUNCTION_URL)$('an').disabled=false});
 function el(t,txt,cls){const e=document.createElement(t);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e}
 function nb(v){const b=document.createElement('bdi');b.dir='ltr';b.textContent=(v==null||v==='')?'غير واضح':String(v);return b}
@@ -122,19 +127,19 @@ function checkSc(sc){
 function renderAn(d){
   const o=$('anout');o.innerHTML='';$('ancard').style.display='block';
   o.appendChild(line((d.pair||'الزوج غير واضح')+' | '+(d.timeframe||'الفريم غير واضح')+' | جودة الصورة: '+(d.image_quality||'غير واضح')));
-  const ok=d.sufficient===true&&d.image_quality!=='poor';
+  const ok=d.sufficient===true&&d.image_quality!=='poor';const T=t=>ok||t==null?t:String(t).replace(/\d+(?:[.,]\d+)+/g,'\u2026');
   if(!ok){o.appendChild(el('div','الصورة لا تكفي لتحليل رقمي. الناقص: '+((d.missing||[]).join('، ')||'غير محدد')+'. لا تُعرض سيناريوهات رقمية ولا نقل للحاسبة.','warn'))}
   const smc=d.smc||{};
   o.appendChild(el('h3','SMC: الهيكلية والسيولة'));
   o.appendChild(line('الفريم المعتمد: ',nb(smc.timeframe_basis),' | الهيكلية: ',nb(smc.structure)));
-  if(smc.summary)o.appendChild(line(smc.summary));
-  (smc.events||[]).forEach(x=>o.appendChild(line('• ',nb(x.type),': '+x.note)));
-  (smc.liquidity||[]).forEach(x=>o.appendChild(line('• سيولة ',nb(x.type),ok&&x.price!=null?' عند ':'',ok&&x.price!=null?nb(x.price):'',': '+x.note)));
+  if(smc.summary)o.appendChild(line(T(smc.summary)));
+  (smc.events||[]).forEach(x=>o.appendChild(line('• ',nb(x.type),': '+T(x.note))));
+  (smc.liquidity||[]).forEach(x=>o.appendChild(line('• سيولة ',nb(x.type),ok&&x.price!=null?' عند ':'',ok&&x.price!=null?nb(x.price):'',': '+T(x.note))));
   o.appendChild(el('h3','SNR: المناطق'));
   o.appendChild(el('div','طريقتا OCL وclassic غير مفعّلتين حتى تحدد تعريفك لهما. المعروض هنا RBS وQM فقط عندما تكون واضحة.','warn'));
   (d.snr||[]).filter(x=>x.type==='RBS'||x.type==='QM'||x.type==='other').forEach(x=>{
     const z=ok?[nb(x.low),' - ',nb(x.high)]:[];
-    o.appendChild(line('• ',nb(x.type),' ('+x.side+') ',...z,': '+x.note))});
+    o.appendChild(line('• ',nb(x.type),' ('+x.side+') ',...z,': '+T(x.note)))});
   o.appendChild(el('h3','السيناريوهات'));
   const scs=(d.scenarios||[]).filter(sc=>sc.zone_type==='RBS'||sc.zone_type==='QM'||sc.zone_type==='other');
   if(ok){
@@ -151,15 +156,15 @@ function renderAn(d){
     (sc.reasons||[]).forEach(r=>box.appendChild(line('- '+r)));
     box.appendChild(el('div','يبطل السيناريو إذا: '+sc.invalidation,'warn'));
     if(!bad){const b=el('button','ضع في الحاسبة (دخول = منتصف المنطقة، هدف = T1)');
-      b.onclick=()=>{$('entry').value=+(((+sc.entry_low)+(+sc.entry_high))/2).toFixed(6);$('stop').value=sc.stop;$('target').value=t[0];if(d.pair)$('pair').value=d.pair;render();$('outcard').scrollIntoView()};
+      b.onclick=()=>{$('entry').value=+(((+sc.entry_low)+(+sc.entry_high))/2).toFixed(6);$('stop').value=sc.stop;$('target').value=t[0];if(d.pair)$('pair').value=d.pair;['entry','stop','target','pair'].forEach(k=>derived.add(k));render();$('outcard').scrollIntoView()};
       box.appendChild(b)}
     o.appendChild(box)});
   if(!scs.length)o.appendChild(el('div','لا توجد سيناريوهات واضحة من هذه الصورة.','warn'));
   }
-  (d.caveats||[]).forEach(c=>o.appendChild(el('div','تنبيه: '+c,'warn')));
+  (d.caveats||[]).forEach(c=>o.appendChild(el('div','تنبيه: '+T(c),'warn')));
 }
 $('an').addEventListener('click',async()=>{
-  $('an').disabled=true;$('go').disabled=true;$('aimsg').textContent='جاري التحليل... قد يستغرق حتى دقيقة.';
+  clearAn();$('an').disabled=true;$('go').disabled=true;$('aimsg').textContent='جاري التحليل... قد يستغرق حتى دقيقة.';
   try{
     const ac=new AbortController();const to=setTimeout(()=>ac.abort(),70000);
     const body={mode:'analyze',image:b64,mimeType:mime};if(b64b){body.image2=b64b;body.mimeType2=mimeb}
