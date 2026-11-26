@@ -126,8 +126,24 @@ function checkSc(sc){
   else{if(!(st>hi))return 'الوقف ليس فوق منطقة الدخول';if(!(lo>t[0]&&t[0]>t[1]&&t[1]>t[2]))return 'الأهداف ليست مرتبة تحت منطقة الدخول'}
   return null;
 }
+const FLAG_AR={target_not_in_liquidity_list:'هدف غير موجود في قائمة السيولة التي كتبها النموذج نفسه',target_wrong_side:'هدف في الجهة الخطأ من منطقة الدخول',stop_wrong_side:'الوقف في الجهة الخطأ من منطقة الدخول',target_side_mismatch:'الهدف على سيولة من الجهة المعاكسة لاتجاه السيناريو',path_zone_type_mismatch:'نوع الدخول (CISD/OB) لا يطابق المسار المكتوب',displacement_entry_not_cisd_or_ob:'مسار الشموع القوية مع FVG يدخل من CISD أو OB فقط',displacement_cites_mss:'مسار بدون MSS لكنه ذكر MSS',displacement_labeled_bos_mss:'سُمّي كسر الشموع القوية BOS أو MSS',cisd_priced_without_mss:'دخول CISD في مسار MSS بسعر لكن بدون موضع MSS',zone_is_single_price:'منطقة سعرها واحد (أدنى = أعلى)، ربما خط شبكة وليست منطقة',side_by_position:'جهة السيولة لا تطابق موضعها (القمة شراء، القاع بيع)',status_vs_conditions:'الحالة "مكتملة" بينما شرط غير متحقق',possible_gridline_price:'سعر قريب من رقم تدريج المحور، تأكد أنه قمة أو قاع فعلي',read_tag_on_round_number:'سعر موسوم READ لكنه رقم تدريج، يجب أن يكون مطبوعاً على لافتة'};
+const FLAG_SOFT=new Set(['possible_gridline_price','read_tag_on_round_number','zone_is_single_price']);
+const PATH_AR={standard_mss_cisd:'مسار MSS ثم CISD',displacement_fvg_no_mss:'شموع قوية عكس الاتجاه مع FVG (بدون MSS)',zone_other:'دخول من منطقة (Classic أو RBS أو QM أو OB أو شمعة رفض)',none:'لا يوجد مسار واضح'};
+const ST_AR={waiting:'بانتظار تحقق الشروط',criteria_met:'الشروط متحققة',no_setup:'لا يوجد setup'};
+let CUR=null;
+function locAr(w){let m;
+ if(m=/^scenarios\[(\d+)\]\.targets\[(\d+)\]$/.exec(w))return 'السيناريو '+(+m[1]+1)+'، الهدف T'+(+m[2]+1);
+ if(m=/^scenarios\[(\d+)\]\.stop$/.exec(w))return 'السيناريو '+(+m[1]+1)+'، الوقف';
+ if(m=/^scenarios\[(\d+)\]\.target_liquidity\[(\d+)\]$/.exec(w))return 'السيناريو '+(+m[1]+1)+'، سيولة الهدف T'+(+m[2]+1);
+ if(m=/^scenarios\[(\d+)\]$/.exec(w))return 'السيناريو '+(+m[1]+1);
+ if(m=/^smc\.events\[(\d+)\]$/.exec(w)){const e=((CUR&&CUR.smc&&CUR.smc.events)||[])[+m[1]];return 'حدث '+(+m[1]+1)+(e?' ('+e.type+(e.price!=null?' '+e.price:'')+')':'')}
+ if(m=/^smc\.liquidity\[(\d+)\]$/.exec(w)){const l=((CUR&&CUR.smc&&CUR.smc.liquidity)||[])[+m[1]];return 'سيولة '+(+m[1]+1)+(l?' ('+(l.side==='buy_side'?'شراء':'بيع')+' '+l.price+')':'')}
+ if(m=/^snr\[(\d+)\]$/.exec(w)){const z=((CUR&&CUR.snr)||[])[+m[1]];return 'منطقة SNR '+(+m[1]+1)+(z?' ('+z.type+')':'')}
+ if(w==='entry_check')return 'حالة الدخول';
+ return w}
+function flagLine(f){const soft=FLAG_SOFT.has(f.code);const d=line((soft?'احتمالي: ':'تناقض: ')+(FLAG_AR[f.code]||f.code)+' ['+locAr(f.where)+']');d.className='warn';return d}
 function renderAn(d){
-  const o=$('anout');o.innerHTML='';$('ancard').style.display='block';
+  CUR=d;const o=$('anout');o.innerHTML='';$('ancard').style.display='block';
   o.appendChild(line((d.pair||'الزوج غير واضح')+' | '+(d.timeframe||'الفريم غير واضح')+' | جودة الصورة: '+(d.image_quality||'غير واضح')));
   const ok=d.sufficient===true&&d.image_quality!=='poor';const T=t=>ok||t==null?t:String(t).replace(/\d+(?:[.,]\d+)+/g,'\u2026');
   if(!ok){o.appendChild(el('div','الصورة لا تكفي لتحليل رقمي. الناقص: '+((d.missing||[]).join('، ')||'غير محدد')+'. لا تُعرض سيناريوهات رقمية ولا نقل للحاسبة.','warn'))}
@@ -143,13 +159,15 @@ function renderAn(d){
     const z=ok?[nb(x.low),' - ',nb(x.high)]:[];
     o.appendChild(line('• ',nb(x.type),' ('+x.side+') ',...z,': '+T(x.note)))});
   o.appendChild(el('h3','السيناريوهات'));
+  if(d.entry_check){const e=d.entry_check;o.appendChild(line('مسار الدخول: '+(PATH_AR[e.entry_path]||'غير واضح')+' | الحالة: '+(ST_AR[e.status]||'غير واضح')+(e.waiting_for?' | بانتظار: '+e.waiting_for:'')))}
   const scs=(d.scenarios||[]).filter(sc=>ZT.concat(['OB','CISD']).includes(sc.zone_type));
   if(ok){
   scs.forEach((sc,i)=>{
     const box=el('div',null,'card');box.dir='auto';
     const bad=checkSc(sc);const t=sc.targets||[];
     box.appendChild(line((i+1)+') ',nb(sc.bias),' من منطقة ',nb(sc.zone_type)));
-    if(bad){box.appendChild(el('div','سيناريو مرفوض: '+bad+'. الأرقام غير معروضة ولا يمكن نقلها للحاسبة.','warn'))}
+    {const oi=(d.scenarios||[]).indexOf(sc);(d.consistency_flags||[]).filter(f=>f.where.indexOf('scenarios['+oi+']')===0).forEach(f=>box.appendChild(flagLine(f)))}
+    if(bad){box.appendChild(el('div','رفض من الصفحة (قاعدة تحقق موجودة في الصفحة من قبل، وليست من فحص التناقضات): '+bad+'. لذلك أرقام هذا السيناريو غير معروضة ولا تُنقل للحاسبة.','warn'))}
     else{
       box.appendChild(line('منطقة الدخول: ',nb(sc.entry_low),' - ',nb(sc.entry_high)));
       box.appendChild(line('الوقف: ',nb(sc.stop)));box.appendChild(line('T1: ',nb(t[0])));box.appendChild(line('T2: ',nb(t[1])));box.appendChild(line('T3: ',nb(t[2])));
@@ -162,6 +180,13 @@ function renderAn(d){
       box.appendChild(b)}
     o.appendChild(box)});
   if(!scs.length)o.appendChild(el('div','لا توجد سيناريوهات واضحة من هذه الصورة.','warn'));
+  }
+  o.appendChild(el('h3','فحص التناقضات (الفحص نفسه يعلّم فقط ولا يحذف ولا يغيّر أي رقم)'));
+  if(!Array.isArray(d.consistency_flags)){o.appendChild(el('div','الفحص غير متاح في هذه النسخة من الخدمة.','warn'))}
+  else{
+    if(!d.consistency_flags.length)o.appendChild(el('div','لم يجد الفحص تناقضاً داخل الإجابة. هذا لا يعني أن قراءة الشارت صحيحة.'));
+    d.consistency_flags.forEach(f=>o.appendChild(flagLine(f)));
+    o.appendChild(el('div','الفحص يقارن الإجابة بنفسها، لا بالشارت. إخفاء أرقام سيناريو يحدث فقط عبر قاعدة الصفحة المذكورة داخل السيناريو (رقم ناقص أو غير مرتب)، وليس من هذا الفحص. قد يفوّته خطأ في قراءة الشموع، وتنبيهات "احتمالي" قد تكون على سعر صحيح.','warn'));
   }
   (d.caveats||[]).forEach(c=>o.appendChild(el('div','تنبيه: '+T(c),'warn')));
 }
