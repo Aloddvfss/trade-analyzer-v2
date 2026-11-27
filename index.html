@@ -94,7 +94,7 @@ $('file').addEventListener('change',e=>{clearAn();const f=e.target.files[0];if(!
 $('go').addEventListener('click',async()=>{
   clearAn();$('go').disabled=true;$('aimsg').textContent='جاري القراءة... قد تستغرق حتى دقيقة.';
   try{
-    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),70000);const r=await fetch(FUNCTION_URL,{signal:ac.signal,method:'POST',headers:{'Content-Type':'application/json','x-passcode':$('pass').value,apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({image:b64,mimeType:mime})});
+    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),130000);const r=await fetch(FUNCTION_URL,{signal:ac.signal,method:'POST',headers:{'Content-Type':'application/json','x-passcode':$('pass').value,apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({image:b64,mimeType:mime})});
     clearTimeout(to);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||r.status);
     if(d.pair){$('pair').value=d.pair;derived.add('pair')}
     for(const k of ['entry','stop','target']){const el=$(k);el.value=d[k]==null?'':d[k];if(d[k]!=null)derived.add(k);
@@ -126,8 +126,8 @@ function checkSc(sc){
   else{if(!(st>hi))return 'الوقف ليس فوق منطقة الدخول';if(!(lo>t[0]&&t[0]>t[1]&&t[1]>t[2]))return 'الأهداف ليست مرتبة تحت منطقة الدخول'}
   return null;
 }
-const FLAG_AR={target_not_in_liquidity_list:'هدف غير موجود في قائمة السيولة التي كتبها النموذج نفسه',target_wrong_side:'هدف في الجهة الخطأ من منطقة الدخول',stop_wrong_side:'الوقف في الجهة الخطأ من منطقة الدخول',target_side_mismatch:'الهدف على سيولة من الجهة المعاكسة لاتجاه السيناريو',path_zone_type_mismatch:'نوع الدخول (CISD/OB) لا يطابق المسار المكتوب',displacement_entry_not_cisd_or_ob:'مسار الشموع القوية مع FVG يدخل من CISD أو OB فقط',displacement_cites_mss:'مسار بدون MSS لكنه ذكر MSS',displacement_labeled_bos_mss:'سُمّي كسر الشموع القوية BOS أو MSS',cisd_priced_without_mss:'دخول CISD في مسار MSS بسعر لكن بدون موضع MSS',zone_is_single_price:'منطقة سعرها واحد (أدنى = أعلى)، ربما خط شبكة وليست منطقة',side_by_position:'جهة السيولة لا تطابق موضعها (القمة شراء، القاع بيع)',status_vs_conditions:'الحالة "مكتملة" بينما شرط غير متحقق',possible_gridline_price:'سعر قريب من رقم تدريج المحور، تأكد أنه قمة أو قاع فعلي',read_tag_on_round_number:'سعر موسوم READ لكنه رقم تدريج، يجب أن يكون مطبوعاً على لافتة',possible_rounded_price:'سعر بلا كسور بينما باقي أسعار الإجابة فيها كسور، تأكد أنه ليس مقرّباً لرقم صحيح أو خط شبكة',stop_not_near_named_level:'الوقف ليس قريباً من أي قمة أو قاع أو منطقة مذكورة في الإجابة نفسها، تأكد أنه مرتبط بمستوى مسمّى وليس مخترعاً أو مقرّباً',zone_bounds_inverted:'حد المنطقة الأدنى أعلى من الحد الأعلى'};
-const FLAG_SOFT=new Set(['possible_gridline_price','read_tag_on_round_number','zone_is_single_price','possible_rounded_price','stop_not_near_named_level']);
+const FLAG_AR={target_not_in_liquidity_list:'هدف غير موجود في قائمة السيولة التي كتبها النموذج نفسه',target_wrong_side:'هدف في الجهة الخطأ من منطقة الدخول',stop_wrong_side:'الوقف في الجهة الخطأ من منطقة الدخول',target_side_mismatch:'الهدف على سيولة من الجهة المعاكسة لاتجاه السيناريو',path_zone_type_mismatch:'نوع الدخول (CISD/OB) لا يطابق المسار المكتوب',displacement_entry_not_cisd_or_ob:'مسار الشموع القوية مع FVG يدخل من CISD أو OB فقط',displacement_cites_mss:'مسار بدون MSS لكنه ذكر MSS',displacement_labeled_bos_mss:'سُمّي كسر الشموع القوية BOS أو MSS',cisd_priced_without_mss:'دخول CISD في مسار MSS بسعر لكن بدون موضع MSS',zone_is_single_price:'منطقة سعرها واحد (أدنى = أعلى)، ربما خط شبكة وليست منطقة',side_by_position:'جهة السيولة لا تطابق موضعها (القمة شراء، القاع بيع)',status_vs_conditions:'الحالة "مكتملة" بينما شرط غير متحقق',possible_gridline_price:'سعر قريب من رقم تدريج المحور، تأكد أنه قمة أو قاع فعلي',read_tag_on_round_number:'سعر موسوم READ لكنه رقم تدريج، يجب أن يكون مطبوعاً على لافتة',possible_rounded_price:'سعر بلا كسور بينما باقي أسعار الإجابة فيها كسور، تأكد أنه ليس مقرّباً لرقم صحيح أو خط شبكة',stop_not_near_named_level:'الوقف ليس قريباً من أي قمة أو قاع أو منطقة مذكورة في الإجابة نفسها، تأكد أنه مرتبط بمستوى مسمّى وليس مخترعاً أو مقرّباً',zone_bounds_inverted:'حد المنطقة الأدنى أعلى من الحد الأعلى',possible_axis_round_price:'سعر على رقم دائري مضاعف لـ 10 وكل أسعار الإجابة بلا كسور، تأكد أنه مستوى فعلي وليس خط شبكة'};
+const FLAG_SOFT=new Set(['possible_gridline_price','read_tag_on_round_number','zone_is_single_price','possible_rounded_price','stop_not_near_named_level','possible_axis_round_price']);
 const PATH_AR={standard_mss_cisd:'مسار MSS ثم CISD',displacement_fvg_no_mss:'شموع قوية عكس الاتجاه مع FVG (بدون MSS)',zone_other:'دخول من منطقة (Classic أو RBS أو QM أو OB أو شمعة رفض)',none:'لا يوجد مسار واضح'};
 const ST_AR={waiting:'بانتظار تحقق الشروط',criteria_met:'الشروط متحققة',no_setup:'لا يوجد setup'};
 let CUR=null;
@@ -195,7 +195,7 @@ function renderAn(d){
 $('an').addEventListener('click',async()=>{
   clearAn();$('an').disabled=true;$('go').disabled=true;$('aimsg').textContent='جاري التحليل... قد يستغرق حتى دقيقة.';
   try{
-    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),70000);
+    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),130000);
     const body={mode:'analyze',image:b64,mimeType:mime};if(b64b){body.image2=b64b;body.mimeType2=mimeb}
     const r=await fetch(FUNCTION_URL,{signal:ac.signal,method:'POST',headers:{'Content-Type':'application/json','x-passcode':$('pass').value,apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify(body)});
     clearTimeout(to);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||r.status);
